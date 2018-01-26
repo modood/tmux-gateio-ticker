@@ -43,9 +43,9 @@ out () {
   then
     if [ -n "$btc_cny" ]
     then
-      echo btc: ¥$btc_cny, xrp: $xrp_change%, doge: $doge_change% > $HOME/.gateio_ticker
+      echo BTC/CNY: ¥$btc_cny, XRP/USDT: $xrp_change%, DOGE/USDT: $doge_change% > $HOME/.gateio_ticker
     else
-      echo btc: \$$btc_usdt, xrp: $xrp_change%, doge: $doge_change% > $HOME/.gateio_ticker
+      echo BTC/USD: \$$btc_usdt, XRP/USDT: $xrp_change%, DOGE/USDT: $doge_change% > $HOME/.gateio_ticker
     fi
   fi
 

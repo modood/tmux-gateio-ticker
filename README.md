@@ -20,7 +20,7 @@ set -g status-right "#{gateio_ticker}"
 Preview:
 
 ```
-btc: ¥76342.84, xrp: -6.27%, doge: 2.35%
+BTC/USD: $11431.12, XRP/USDT: -8.25%, DOGE/USDT: 3.03%
 ```
 
 Installation
