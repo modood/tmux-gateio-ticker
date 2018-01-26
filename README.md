@@ -17,6 +17,12 @@ Add it to `status-right` or `status-left` tmux option:
 set -g status-right "#{gateio_ticker}"
 ```
 
+Preview:
+
+```
+btc: ¥76342.84, xrp: -6.27%, doge: 2.35%
+```
+
 Installation
 ------------
 
