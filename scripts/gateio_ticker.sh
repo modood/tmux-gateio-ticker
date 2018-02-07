@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 
+CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$CURRENT_DIR/helpers.sh"
+
 # return: currencies
 fetch () {
   timeout 1 wget http://data.gate.io/api2/1/tickers -qO-
-}
-
-# $1:     currency name
-# return: currency
-fetch_single () {
-  timeout 1 wget http://data.gate.io/api2/1/ticker/$1 -qO-
 }
 
 # $1:     currencies
@@ -53,24 +50,47 @@ tofixed () {
   fi
 }
 
+# $1:     string
+# return: string
+symbol () {
+  local s
+  declare -l s # to upcase
+  s=`echo "$1" | sed "s/\//_/g"`
+  echo "$s"
+}
+
+option_currencies_default="BTC/USDT ETH/USDT@percent"
+get_option_currencies () {
+	echo `get_tmux_option "@gateio_ticker_currencies" "$option_currencies_default"`
+}
+
 out () {
   digits=4
   currencies=`fetch`
   cachefile=$HOME/.gateio_ticker
 
-  local btc_usdt=`tofixed $(price $(currency $currencies btc_usdt)) $digits`
-  local btc_cny=`tofixed $(echo "$btc_usdt * $(price $(fetch_single usdt_cny))" | bc) $digits`
-  local xrp_change=`tofixed $(change $(currency $currencies xrp_usdt)) $digits`
-  local doge_change=`tofixed $(change $(currency $currencies doge_usdt)) $digits`
+  option_currencies=`get_option_currencies`
+  option_currencies=($option_currencies)
 
   if [ -n "$currencies" ]
   then
-    if [ -n "$btc_cny" ]
-    then
-      echo BTC/CNY: ¥$btc_cny, XRP/USDT: $xrp_change%, DOGE/USDT: $doge_change% > $cachefile
-    else
-      echo BTC/USD: \$$btc_usdt, XRP/USDT: $xrp_change%, DOGE/USDT: $doge_change% > $cachefile
-    fi
+    local str
+    for e in "${option_currencies[@]}"
+    do
+      IFS=@ a=($e)
+
+      local c=${a[0]}
+      local t=${a[1]}
+      local s=`symbol "$c"`
+
+      local p=`tofixed $(price $(currency $currencies \"$s\")) $digits`
+      if [ $t = percent ]
+      then
+        local p="$p "`tofixed $(change $(currency $currencies \"$s\")) $digits`%
+      fi
+      str="$str$c: $p, "
+    done
+    echo ${str%,*} > $cachefile
   fi
 
   cat $cachefile
@@ -79,5 +99,4 @@ out () {
 main() {
   out 2> /dev/null
 }
-
 main
