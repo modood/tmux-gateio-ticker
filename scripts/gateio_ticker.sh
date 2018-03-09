@@ -5,7 +5,7 @@ source "$CURRENT_DIR/helpers.sh"
 
 # return: currencies
 fetch () {
-  timeout 1 wget http://data.gate.io/api2/1/tickers -qO-
+  timeout 1 wget http://data.gateio.io/api2/1/tickers -qO-
 }
 
 # $1:     currencies
@@ -24,7 +24,7 @@ price () {
 # $1:     currency
 # return: number
 change () {
-  echo $1 | grep -Po 'percentChange[": ]+\K[^",]+'
+  echo $@ | grep -Po 'percentChange[": ]+\K[^",]+'
 }
 
 # $1:     number
@@ -72,9 +72,28 @@ out () {
   option_currencies=`get_option_currencies`
   option_currencies=($option_currencies)
 
-  if [ -n "$currencies" ]
+  # ensure response is valid
+  local btc=`echo $currencies | grep -Po '\"btc_usdt\"'`
+  if [ -n "$btc" ]
   then
-    local str
+    local all=`change $(echo $(currency $currencies '_usdt"'))`
+    local rise=0
+    local fall=0
+    all=($all)
+    for f in ${all[@]}
+    do
+      local gt0=`echo "$f > 0" | bc`
+      local lt0=`echo "$f < 0" | bc`
+      if [[ $gt0 -eq 1 ]]
+      then
+        let rise++
+      elif [[ $lt0 -eq 1 ]]
+      then
+        let fall++
+      fi
+    done
+    local str="MARKET: $rise↑ $fall↓, "
+
     for e in "${option_currencies[@]}"
     do
       IFS=@ a=($e)
