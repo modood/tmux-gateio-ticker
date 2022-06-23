@@ -3,33 +3,41 @@
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$CURRENT_DIR/helpers.sh"
 
-# return: currencies
-fetch () {
-  timeout 1 wget http://data.gateio.io/api2/1/tickers -qO-
-}
-
-# $1:     currencies
-# $2:     currency name
-# return: currency
+# get currency info by ticker name
+# $1:       ticker_name       string
+# return:   currency_info     json
+#
+# example:
+#     $ currency "btc_usdt"
 currency () {
-  echo $1 | grep -Po $2'["{: ]+\K[^}]+'
+  timeout 3 wget https://data.gate.io/api2/1/ticker/$1 -qO-
+ #timeout 3 wget https://data.gateapi.io/api2/1/ticker/$1 -qO-
 }
 
-# $1:     currency
-# return: number
+# get price from currency info
+# $1:       currency_info     json
+# return:   price             number
+# example:
+#     $ price `currency "btc_usdt"`
 price () {
   echo $1 | grep -Po 'last[": ]+\K[^",]+'
 }
 
-# $1:     currency
-# return: number
+# get percentage change from currency info
+# $1:       currency_info     json
+# return:   percentage        number
+# example:
+#     $ change `currency "btc_usdt"`
 change () {
   echo $@ | grep -Po 'percentChange[": ]+\K[^",]+'
 }
 
-# $1:     number
-# $2:     digits
-# return: number
+# formats a number using fixed-point notation
+# $1:       number            number
+# $2:       digits            number
+# return:   number            number
+# example:
+#     $ tofixed 20222.328327482 4
 tofixed () {
   local f=`echo "scale=$2;$1/1" | bc`
   local gt=`echo "$f > -1" | bc`
@@ -50,9 +58,12 @@ tofixed () {
   fi
 }
 
-# $1:     string
-# return: string
-symbol () {
+# get ticker name from symbol name
+# $1:       symbol_name       string
+# return:   ticker_name       string
+# example:
+#     $ ticker "BTC/USDT"
+ticker () {
   local s
   declare -l s # to upcase
   s=`echo "$1" | sed "s/\//_/g"`
@@ -61,58 +72,28 @@ symbol () {
 
 option_currencies_default="BTC/USDT ETH/USDT@percent"
 get_option_currencies () {
-	echo `get_tmux_option "@gateio_ticker_currencies" "$option_currencies_default"`
+  echo `get_tmux_option "@gateio_ticker_currencies" "$option_currencies_default"`
 }
 
 out () {
-  digits=4
-  currencies=`fetch`
-  cachefile=$HOME/.gateio_ticker
+  option_currencies=(`get_option_currencies`)
+  for e in "${option_currencies[@]}"
+  do
+    IFS=@ a=($e)
 
-  option_currencies=`get_option_currencies`
-  option_currencies=($option_currencies)
+    local symbol_name=${a[0]}
+    local symbol_option=${a[1]}
+    local ticker_name=`ticker "$symbol_name"`
+    local currency_info=$(currency $ticker_name)
 
-  # ensure response is valid
-  local btc=`echo $currencies | grep -Po '\"btc_usdt\"'`
-  if [ -n "$btc" ]
-  then
-    local all=`change $(echo $(currency $currencies '_usdt"'))`
-    local rise=0
-    local fall=0
-    all=($all)
-    for f in ${all[@]}
-    do
-      local gt0=`echo "$f > 0" | bc`
-      local lt0=`echo "$f < 0" | bc`
-      if [[ $gt0 -eq 1 ]]
-      then
-        let rise++
-      elif [[ $lt0 -eq 1 ]]
-      then
-        let fall++
-      fi
-    done
-    local str="MARKET: $rise↑ $fall↓, "
-
-    for e in "${option_currencies[@]}"
-    do
-      IFS=@ a=($e)
-
-      local c=${a[0]}
-      local t=${a[1]}
-      local s=`symbol "$c"`
-
-      local p=`tofixed $(price $(currency $currencies \"$s\")) $digits`
-      if [ $t = percent ]
-      then
-        local p="$p "`tofixed $(change $(currency $currencies \"$s\")) $digits`%
-      fi
-      str="$str$c: $p, "
-    done
-    echo ${str%,*} > $cachefile
-  fi
-
-  cat $cachefile
+    local symbol_price=`tofixed $(price $currency_info) 4`
+    if [ $symbol_option = percent ]
+    then
+      local symbol_price="$symbol_price "`tofixed $(change $currency_info) 2`%
+    fi
+    str="$str$symbol_name: $symbol_price, "
+  done
+  echo $(date +'%Y-%m-%d %H:%M:%S') ${str%,*}
 }
 
 main() {
